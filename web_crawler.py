@@ -1,6 +1,6 @@
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
-from collections import Queue
+from queue import Queue
 from multiprocessing.pool import ThreadPool
 import threading
 
@@ -16,8 +16,8 @@ def run(globalUrl):
     
     """
     
-     
-    queue = Queue()
+    
+    #initialize stuff
     websites = Queue()
     visited_websites = set()
     numWorkers = 4
@@ -34,10 +34,12 @@ def run(globalUrl):
                 if websites:
                 
                     url = websites.get()
-                    working[ID] = True
+                    idle[ID] = False
+                
                 elif all(idle): 
                     #there are no more websites to process, and none of the other threads are adding links either
                     return
+                
                 else: 
                     #wait for threads to finish running / more websites to appear
                     continue
@@ -54,11 +56,11 @@ def run(globalUrl):
                     if link not in visited_websites:
                         visited_websites.add(link)
                         websites.put(link)
-                working[ID] = False
+                idle[ID] = True
                 
     websites.put(globalUrl)
     
-    Threadool(numWorkers).imap_unordered(worker, range(numWorkers))
+    ThreadPool(numWorkers).imap_unordered(worker, range(numWorkers))
     
     return visited_websites()
     
