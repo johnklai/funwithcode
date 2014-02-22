@@ -62,5 +62,8 @@ def run(globalUrl):
     
     ThreadPool(numWorkers).imap_unordered(worker, range(numWorkers))
     
-    return visited_websites()
+    return visited_websites
     
+if __name__ == '__main__':
+
+    run("http://www.python.org")
