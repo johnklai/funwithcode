@@ -1,7 +1,8 @@
 from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from queue import Queue
-from multiprocessing.pool import ThreadPool
 import threading
 
 def run(globalUrl):
@@ -24,46 +25,77 @@ def run(globalUrl):
     idle = [True]*numWorkers
     
     lock = threading.Lock()
+    condition = threading.Condition()
     
     def worker(ID):
+        print("worker %s starting" % ID)
         
         while True: 
             
             #check if there are any websites left to be processed, and get the top one if necessary
-            with lock:
-                if websites:
+            lock.acquire()
+            if not(websites.empty()):
+                url = websites.get()
+                idle[ID] = False
+                lock.release()
+            
+            elif all(idle): 
                 
-                    url = websites.get()
-                    idle[ID] = False
-                
-                elif all(idle): 
-                    #there are no more websites to process, and none of the other threads are adding links either
-                    return
-                
-                else: 
-                    #wait for threads to finish running / more websites to appear
-                    continue
+                #there are no more websites to process, and none of the other threads are adding links either
+                lock.release()
+                return
+            else: 
+                #wait for threads to finish running / more websites to appear
+                with condition:
+                    lock.release()
+                    condition.wait()
+                continue
             
             page = urlopen(url)
             soup = BeautifulSoup(page)
             
             links = []
             
-            #run code here
+            #process the links
+            for link in soup.find_all('a'):
+                
+                ref = link.get('href')
+                new_url = urljoin(url, ref)
+                
+                #check if it's an internal link
+                if new_url.startswith(globalUrl):
+                    
+                    #add to the queue
+                    links.append(new_url)
             
-            with lock:
-                for link in links:
+            
+            for link in links:
+                with lock:
                     if link not in visited_websites:
                         visited_websites.add(link)
                         websites.put(link)
-                idle[ID] = True
+
+            with lock:
+                with condition: 
+                    idle[ID] = True      
+                    condition.notifyAll()     
+                
                 
     websites.put(globalUrl)
+    visited_websites.add(globalUrl)
     
-    ThreadPool(numWorkers).imap_unordered(worker, range(numWorkers))
+    threads = [threading.Thread(target=worker,args=(i,)) for i in range(numWorkers)]
+    
+    for thread in threads:
+        thread.start()
+        
+    for thread in threads:
+        thread.join()
     
     return visited_websites
     
 if __name__ == '__main__':
 
-    run("http://www.python.org")
+    sites = run("http://www.python.org")
+    print(len(sites))
+    print(sites)
