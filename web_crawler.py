@@ -28,12 +28,28 @@ def run(globalUrl):
     condition = threading.Condition()
     
     def worker(ID):
+        ### COMMENT(JKL): You can do:
+        ### print "worker %s starting" % ID (no need for the parens)
         print("worker %s starting" % ID)
         
         while True: 
             
+            ### COMMENT(JKL): You can use the 'with' statement in Python to avoid having to call lock.acquire()
+            ### and lock.release():
+            ### with lock:
+            ###   if websites:
+            ###     url = websites.get()
+            ###   elif all(idle):
+            ###     return
+            ###   else:
+            ###     condition.wait()
+            ###     continue
+            
             #check if there are any websites left to be processed, and get the top one if necessary
             lock.acquire()
+            
+            ### COMMENT(JKL): You can do:
+            ###     if not website.empty(): (no need for the parens)
             if not(websites.empty()):
                 url = websites.get()
                 idle[ID] = False
