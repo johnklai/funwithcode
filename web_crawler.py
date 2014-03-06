@@ -25,7 +25,7 @@ def run(globalUrl):
     idle = [True]*numWorkers
     
     lock = threading.Lock()
-    condition = threading.Condition()
+    condition = threading.Condition(lock)
     
     def worker(ID):
         ### COMMENT(JKL): You can do:
@@ -46,26 +46,38 @@ def run(globalUrl):
             ###     continue
             
             #check if there are any websites left to be processed, and get the top one if necessary
-            lock.acquire()
+            ### lock.acquire()
             
             ### COMMENT(JKL): You can do:
             ###     if not website.empty(): (no need for the parens)
-            if not(websites.empty()):
-                url = websites.get()
-                idle[ID] = False
-                lock.release()
             
-            elif all(idle): 
-                
-                #there are no more websites to process, and none of the other threads are adding links either
-                lock.release()
-                return
-            else: 
-                #wait for threads to finish running / more websites to appear
-                with condition:
-                    lock.release()
+            ### OLD CODE
+            ### if not(websites.empty()):
+            ###     url = websites.get()
+            ###     idle[ID] = False
+            ###     lock.release()
+            ### 
+            ### elif all(idle): 
+            ###     
+            ###     #there are no more websites to process, and none of the other threads are adding links either
+            ###     lock.release()
+            ###     return
+            ### else: 
+            ###     #wait for threads to finish running / more websites to appear
+            ###     with condition:
+            ###         lock.release()
+            ###         condition.wait()
+            ###     continue
+            
+            with lock:
+                if not websites.empty():
+                    url = websites.get()
+                    idle[ID] = False
+                elif all(idle):
+                    return
+                else:
                     condition.wait()
-                continue
+                    continue
             
             page = urlopen(url)
             soup = BeautifulSoup(page)
@@ -92,9 +104,8 @@ def run(globalUrl):
                         websites.put(link)
 
             with lock:
-                with condition: 
-                    idle[ID] = True      
-                    condition.notifyAll()     
+                idle[ID] = True      
+                condition.notifyAll()     
                 
                 
     websites.put(globalUrl)
